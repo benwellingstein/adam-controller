@@ -183,7 +183,6 @@ function setControlsForMode(mode) {
   stepRight.disabled = !isWrite;
   clearPatternButton.disabled = !isWrite;
   patternDial.classList.toggle("is-disabled", !isWrite);
-  loopLengthDial.classList.toggle("is-disabled", !isWrite);
   octaveUpButton.disabled = !isWrite;
   octaveDownButton.disabled = !isWrite;
 }
@@ -387,7 +386,6 @@ loopLengthDial.addEventListener("wheel", (event) => {
 });
 
 loopLengthDial.addEventListener("keydown", (event) => {
-  if (loopLengthDial.classList.contains("is-disabled")) return;
   if (event.key === "ArrowUp" || event.key === "ArrowRight") {
     event.preventDefault();
     setSlotLoopLength(sequencer.getLoopLength() + 1);

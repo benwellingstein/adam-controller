@@ -312,3 +312,42 @@ test("playback wraps at the loop length instead of step 16", () => {
   assert.equal(sequencer.getState().playhead, 0);
   assert.deepEqual(notesOn, [60, 60]);
 });
+
+function pulses(sequencer, count) {
+  for (let i = 0; i < count; i++) sequencer.handleClockPulse();
+}
+
+test("shrinking the loop below the playhead mid-play wraps to step 0 on the next step", () => {
+  const { sequencer } = makeHarness();
+  sequencer.setMode("play");
+  sequencer.handleStart();
+  pulses(sequencer, 10 * 6); // playhead -> 10
+  assert.equal(sequencer.getState().playhead, 10);
+  sequencer.setLoopLength(4);
+  pulses(sequencer, 6);
+  assert.equal(sequencer.getState().playhead, 0);
+});
+
+test("growing the loop mid-play lets the playhead continue past the old end", () => {
+  const { sequencer } = makeHarness();
+  sequencer.setLoopLength(4);
+  sequencer.setMode("play");
+  sequencer.handleStart();
+  pulses(sequencer, 3 * 6); // playhead -> 3 (last step of the 4-step loop)
+  assert.equal(sequencer.getState().playhead, 3);
+  sequencer.setLoopLength(8);
+  pulses(sequencer, 6);
+  assert.equal(sequencer.getState().playhead, 4);
+});
+
+test("changing the loop length mid-note does not cut the note short", () => {
+  const { sequencer, notesOff } = makeHarness();
+  sequencer.inputNote(60);
+  sequencer.setMode("play");
+  sequencer.handleStart(); // note 60 on, gate 3 pulses
+  pulses(sequencer, 1);
+  sequencer.setLoopLength(2);
+  assert.deepEqual(notesOff, []);
+  pulses(sequencer, 2);
+  assert.deepEqual(notesOff, [60]);
+});

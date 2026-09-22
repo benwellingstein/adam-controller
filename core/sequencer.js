@@ -130,7 +130,9 @@ export function createSequencer({ onLedChange, onNoteOn, onNoteOff }) {
   }
 
   function advanceStep() {
-    playhead = (playhead + 1) % loopLength;
+    // Not modulo: if the loop was shortened below the playhead mid-play,
+    // wrap to step 0 rather than jumping to (playhead + 1) % loopLength.
+    playhead = playhead + 1 >= loopLength ? 0 : playhead + 1;
     triggerCurrentStep();
     emitAllLeds();
   }
