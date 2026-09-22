@@ -59,13 +59,29 @@ test("toggleMute dims a programmed step but keeps its note", () => {
   sequencer.inputNote(60);
   sequencer.moveCursor(-1); // back to step 0
   sequencer.toggleMute();
-  assert.equal(ledColors[0], "dim-green");
   assert.equal(sequencer.getPattern()[0].note, 60);
   assert.equal(sequencer.getPattern()[0].muted, true);
+  sequencer.moveCursor(1); // move cursor off step 0 to see its own color
+  assert.equal(ledColors[0], "dim-green");
 
+  sequencer.moveCursor(-1);
   sequencer.toggleMute();
-  assert.equal(ledColors[0], "green");
   assert.equal(sequencer.getPattern()[0].muted, false);
+  sequencer.moveCursor(1);
+  assert.equal(ledColors[0], "green");
+});
+
+test("the write-mode cursor is always yellow, even on a programmed or muted step", () => {
+  const { sequencer, ledColors } = makeHarness();
+  sequencer.inputNote(60); // step 0 programmed, cursor now on 1
+  assert.equal(ledColors[0], "green");
+
+  sequencer.moveCursor(-1); // cursor back onto the programmed step 0
+  assert.equal(ledColors[0], "yellow");
+
+  sequencer.toggleMute(); // still under the cursor, still yellow
+  assert.equal(ledColors[0], "yellow");
+  assert.equal(sequencer.getPattern()[0].muted, true);
 });
 
 test("inputNote while muted overwrites the note and un-mutes", () => {
@@ -86,38 +102,74 @@ test("handleClockPulse does nothing while not running", () => {
   assert.equal(sequencer.getState().playhead, 0);
 });
 
+test("handleStart rewinds to step 0 and fires its note immediately", () => {
+  const { sequencer, notesOn, ledColors } = makeHarness();
+  sequencer.inputNote(60); // step 0 = note 60
+  sequencer.setMode("play");
+  sequencer.handleStart();
+
+  assert.equal(sequencer.getState().playhead, 0);
+  assert.equal(notesOn.length, 1);
+  assert.equal(notesOn[0], 60);
+  assert.equal(ledColors[0], "green"); // sounding step lights up right away
+});
+
+test("handleStart from a stopped mid-pattern position rewinds the playhead", () => {
+  const { sequencer, notesOn } = makeHarness();
+  sequencer.inputNote(60); // step 0 = note 60
+  sequencer.setMode("play");
+  sequencer.handleStart(); // fires step 0 (notesOn: 1)
+  for (let i = 0; i < 6 * 3; i++) sequencer.handleClockPulse(); // 3 advances -> step 3
+  assert.equal(sequencer.getState().playhead, 3);
+  sequencer.handleStop();
+
+  sequencer.handleStart();
+  assert.equal(sequencer.getState().playhead, 0);
+  assert.equal(notesOn.length, 2); // step 0 re-fired on restart
+});
+
+test("handleContinue resumes without rewinding and without re-triggering", () => {
+  const { sequencer, notesOn } = makeHarness();
+  sequencer.inputNote(60); // step 0 = note 60
+  sequencer.setMode("play");
+  sequencer.handleStart(); // notesOn: 1, playhead 0
+  for (let i = 0; i < 6 * 3; i++) sequencer.handleClockPulse(); // -> step 3
+  sequencer.handleStop();
+  const beforeContinue = notesOn.length;
+
+  sequencer.handleContinue();
+  assert.equal(sequencer.getState().playhead, 3);
+  assert.equal(sequencer.getState().running, true);
+  assert.equal(notesOn.length, beforeContinue); // no immediate re-trigger
+});
+
 test("advances one step every 6 clock pulses while running, firing note-on once per revolution for a programmed step", () => {
   const { sequencer, notesOn } = makeHarness();
   sequencer.inputNote(60); // step 0 = note 60, cursor advances to 1
   sequencer.setMode("play"); // playhead reset to 0
-  sequencer.handleStart();
+  sequencer.handleStart(); // step 0 fires immediately
+  assert.equal(notesOn.length, 1);
 
   for (let i = 0; i < 5; i++) sequencer.handleClockPulse();
-  assert.equal(notesOn.length, 0); // not yet at the 6th pulse
+  assert.equal(sequencer.getState().playhead, 0); // not yet at the 6th pulse
 
   sequencer.handleClockPulse(); // 6th pulse: advance to step 1 (empty, no note)
   assert.equal(sequencer.getState().playhead, 1);
-  assert.equal(notesOn.length, 0);
+  assert.equal(notesOn.length, 1);
 
   // Advance through steps 2..15 and wrap back around to step 0 (15 more
   // step-advances = 15 * 6 = 90 pulses), where the programmed note lives.
   for (let i = 0; i < 15 * 6; i++) sequencer.handleClockPulse();
   assert.equal(sequencer.getState().playhead, 0);
-  assert.equal(notesOn.length, 1);
-  assert.equal(notesOn[0], 60);
+  assert.equal(notesOn.length, 2);
+  assert.equal(notesOn[1], 60);
 });
 
-test("fires note-off exactly 3 pulses (50% gate) after note-on, and skips muted/empty steps", () => {
+test("fires note-off exactly 3 pulses (50% gate) after note-on", () => {
   const { sequencer, notesOn, notesOff } = makeHarness();
   sequencer.inputNote(60); // step 0
   sequencer.setMode("play");
-  sequencer.handleStart();
-
-  // 16 step-advances (1 + 15) bring the playhead all the way around back to
-  // step 0, where the programmed note fires.
-  for (let i = 0; i < 6; i++) sequencer.handleClockPulse();
-  for (let i = 0; i < 15 * 6; i++) sequencer.handleClockPulse();
-  assert.equal(sequencer.getState().playhead, 0);
+  sequencer.handleStart(); // note-on for step 0
   assert.equal(notesOn.length, 1);
   assert.equal(notesOff.length, 0);
 
@@ -129,15 +181,45 @@ test("fires note-off exactly 3 pulses (50% gate) after note-on, and skips muted/
   assert.equal(notesOff[0], 60);
 });
 
+test("skips empty steps during playback", () => {
+  const { sequencer, notesOn } = makeHarness();
+  sequencer.inputNote(60); // step 0 only
+  sequencer.setMode("play");
+  sequencer.handleStart(); // step 0 fires
+  assert.equal(notesOn.length, 1);
+
+  // Steps 1..15 are empty: 15 step-advances produce no further note-ons.
+  for (let i = 0; i < 15 * 6; i++) sequencer.handleClockPulse();
+  assert.equal(sequencer.getState().playhead, 15);
+  assert.equal(notesOn.length, 1);
+});
+
+test("skips a muted step that has a note during playback", () => {
+  const { sequencer, notesOn } = makeHarness();
+  sequencer.inputNote(60); // step 0 = note 60, cursor now on step 1
+  sequencer.inputNote(64); // step 1 = note 64, cursor now on step 2
+  sequencer.moveCursor(-1); // back to step 1
+  sequencer.toggleMute(); // step 1 is muted but still holds note 64
+  assert.deepEqual(sequencer.getPattern()[1], { note: 64, muted: true });
+
+  sequencer.setMode("play");
+  sequencer.handleStart(); // step 0 fires
+  assert.deepEqual(notesOn, [60]);
+
+  for (let i = 0; i < 6; i++) sequencer.handleClockPulse(); // advance to step 1
+  assert.equal(sequencer.getState().playhead, 1);
+  assert.deepEqual(notesOn, [60]); // muted step 1 fired nothing
+});
+
 test("handleStop halts playback, cuts any active note, and resets pulse count", () => {
   const { sequencer, notesOff } = makeHarness();
   sequencer.inputNote(60);
   sequencer.setMode("play");
-  sequencer.handleStart();
-  // 16 step-advances bring the playhead back around to step 0, triggering the note.
-  for (let i = 0; i < 16 * 6; i++) sequencer.handleClockPulse();
+  sequencer.handleStart(); // note-on for step 0, gate open for 3 pulses
+  sequencer.handleClockPulse(); // gate still open
   sequencer.handleStop();
   assert.equal(notesOff.length, 1);
+  assert.equal(notesOff[0], 60);
   assert.equal(sequencer.getState().running, false);
 });
 

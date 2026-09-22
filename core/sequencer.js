@@ -17,11 +17,10 @@ export function createSequencer({ onLedChange, onNoteOn, onNoteOff }) {
 
   function ledColorForStep(index) {
     if (mode === "write") {
+      // The write-mode cursor is always yellow, even on a programmed or muted
+      // step, so the edit position is never hidden by pattern content.
+      if (index === cursor) return LED_YELLOW;
       const step = pattern[index];
-      if (index === cursor) {
-        if (step.note === null) return LED_YELLOW;
-        return step.muted ? LED_DIM_GREEN : LED_GREEN;
-      }
       if (step.note === null) return LED_OFF;
       return step.muted ? LED_DIM_GREEN : LED_GREEN;
     }
@@ -71,9 +70,14 @@ export function createSequencer({ onLedChange, onNoteOn, onNoteOff }) {
   }
 
   // Play-mode / clock behavior implemented in Task 2.
+  // Start rewinds to step 0 and plays it immediately.
   function handleStart() {
     if (mode !== "play") return;
+    playhead = 0;
+    clockPulseCount = 0;
     running = true;
+    triggerCurrentStep();
+    emitAllLeds();
   }
 
   function handleStop() {
@@ -112,14 +116,18 @@ export function createSequencer({ onLedChange, onNoteOn, onNoteOff }) {
     }
   }
 
-  function advanceStep() {
-    playhead = (playhead + 1) % STEP_COUNT;
+  function triggerCurrentStep() {
     const step = pattern[playhead];
     if (!step.muted && step.note !== null) {
       onNoteOn(step.note);
       activeNote = step.note;
       gatePulsesRemaining = 3;
     }
+  }
+
+  function advanceStep() {
+    playhead = (playhead + 1) % STEP_COUNT;
+    triggerCurrentStep();
     emitAllLeds();
   }
 
