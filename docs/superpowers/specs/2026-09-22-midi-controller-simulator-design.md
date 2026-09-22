@@ -11,22 +11,28 @@ transport/navigation controls. See `sketch.jpg` in the project root for the
 hand-drawn panel layout this design is based on.
 
 Before any hardware exists, this phase builds a website that simulates the
-controller's front panel and behavior in the browser, using the real Web MIDI
-API. It will be hosted as static files (Netlify or GitHub Pages) so it can be
-iterated on collaboratively. A later phase will port the sequencer logic to
-ESP32 firmware and design a 3D-printed case — out of scope here, but this
-design deliberately isolates the sequencing logic so that port is
-straightforward.
+controller's front panel and behavior in the browser. MIDI In is simulated
+on-screen (no real MIDI input device involved) via a toggle and a settable
+BPM field, standing in for the real MIDI clock the hardware will eventually
+receive. MIDI Out is real, via the Web MIDI API, so the programmed pattern
+can actually play into a DAW or synth, alongside an audible WebAudio voice
+so it's audible with no device attached at all. The site will be hosted as
+static files (Netlify or GitHub Pages) so it can be iterated on
+collaboratively. A later phase will port the sequencer logic to ESP32
+firmware and design a 3D-printed case — out of scope here, but this design
+deliberately isolates the sequencing logic so that port is straightforward.
 
 ## Scope
 
 **In scope for this phase:**
-- MIDI In: receive MIDI clock (tempo sync) and Start/Continue/Stop transport
-  messages via Web MIDI API, with a fallback internal-BPM clock for testing
-  without hardware.
-- MIDI Out: send Note On/Off for the programmed pattern during playback, plus
-  an audible WebAudio synth voice (web-only convenience, so Adam/Ben can hear
-  the pattern without a real synth attached).
+- MIDI In: simulated only — an on/off toggle acts as the transport
+  start/stop signal, and a settable BPM number field drives an internal
+  clock at the equivalent rate real MIDI clock pulses would arrive at. No
+  real Web MIDI input device is used for this phase.
+- MIDI Out: real, via Web MIDI API — send Note On/Off for the programmed
+  pattern during playback to a selected output device, plus an audible
+  WebAudio synth voice (web-only convenience, so Adam/Ben can hear the
+  pattern without a real synth attached).
 - Write/Play mode switch (top toggle).
 - Transport Play button (bottom-left, starts/stops playback in Play mode).
 - 16 RGB-style step LEDs (yellow = cursor being programmed, green = programmed
@@ -52,7 +58,8 @@ and keeps the core logic close to portable C-like pseudocode).
 
 ```
 core/sequencer.js   – pure logic, zero DOM/Web MIDI dependencies
-web/midi.js         – Web MIDI API glue + WebAudio synth playback
+web/clock-sim.js    – simulated MIDI In: on/off toggle + settable-BPM clock
+web/midi.js         – real Web MIDI Out glue + WebAudio synth playback
 web/ui.js           – DOM rendering + input wiring
 index.html
 style.css
@@ -80,10 +87,11 @@ clockPulseCount: number // counts 0-5 between steps (6 pulses = one 1/16 step)
 ```
 
 Inputs (functions called by the web adapter):
-- `handleClockPulse()` — call on each incoming 0xF8 clock pulse (or internal
-  fallback timer tick at the equivalent rate). Every 6th call advances the
-  step.
-- `handleStart()`, `handleStop()`, `handleContinue()` — transport control.
+- `handleClockPulse()` — call on each simulated clock tick (from the BPM-driven
+  internal timer for this phase; a real 0xF8 MIDI clock pulse once the ESP32
+  has a real MIDI In jack). Every 6th call advances the step.
+- `handleStart()`, `handleStop()`, `handleContinue()` — transport control
+  (driven by the simulated MIDI In toggle for this phase).
 - `setMode("write" | "play")` — switching to "write" stops playback and
   resets `running = false`; switching to "play" resets `playhead = 0` and
   `running = false` (playback doesn't auto-start — the PLAY button or an
@@ -100,16 +108,21 @@ Outputs (callbacks the web adapter subscribes to):
 - `onNoteOn(noteNumber)`, `onNoteOff(noteNumber)` — fired only during Play
   mode playback, per the 50%-gate timing below.
 
-### `web/midi.js`
+### `web/clock-sim.js` (simulated MIDI In)
 
-- Requests Web MIDI access (`navigator.requestMIDIAccess()`), populates
-  MIDI In / MIDI Out device-select dropdowns from the available ports.
-- Parses raw MIDI In bytes: `0xF8` → `handleClockPulse()`, `0xFA` →
-  `handleStart()`, `0xFB` → `handleContinue()`, `0xFC` → `handleStop()`.
-- Fallback clock: if no MIDI In device is selected, or no clock pulse has
-  arrived within 2 seconds while `running`, drive `handleClockPulse()` from
-  an internal `setInterval` computed from a user-editable BPM field instead.
-  Reverts to real clock pulses automatically the instant one arrives.
+- A toggle switch stands in for MIDI In transport: switching it on calls the
+  core's `handleStart()`; off calls `handleStop()`.
+- A settable BPM number field drives an internal `setInterval`, computed to
+  fire at the equivalent rate of 24-ppqn MIDI clock pulses at that BPM, and
+  calls the core's `handleClockPulse()` on each tick. Changing the BPM value
+  live updates the interval immediately.
+- No Web MIDI input device or real clock bytes are involved for this phase —
+  this whole module is a stand-in for the hardware's future MIDI In jack.
+
+### `web/midi.js` (real MIDI Out)
+
+- Requests Web MIDI access (`navigator.requestMIDIAccess()`), populates a
+  MIDI Out device-select dropdown from the available output ports.
 - On `onNoteOn`/`onNoteOff` from the core: sends real Note On/Off bytes to
   the selected MIDI Out device (if any), AND triggers a simple WebAudio
   synth voice (e.g. a short oscillator envelope) so the pattern is audible
@@ -119,10 +132,11 @@ Outputs (callbacks the web adapter subscribes to):
 ### `web/ui.js`
 
 - Renders the panel matching the sketch layout: top bar (Write/Play switch,
-  PLAY transport button, MIDI In/Out status + device pickers), 16-LED row
-  (grouped in 4s), bottom row (OCT placeholder, 12-key piano-style keyboard,
-  pattern-select/clear-pattern placeholders, step-nav triangle/square/triangle
-  cluster, bottom PLAY button).
+  PLAY transport button, simulated MIDI In toggle + BPM field, MIDI Out
+  device picker/status), 16-LED row (grouped in 4s), bottom row (OCT
+  placeholder, 12-key piano-style keyboard, pattern-select/clear-pattern
+  placeholders, step-nav triangle/square/triangle cluster, bottom PLAY
+  button).
 - Wires DOM clicks/keys to the core's input functions and re-renders LEDs
   from `onLedChange` events.
 - Disabled placeholder controls (OCT, pattern select, clear pattern) are
@@ -147,9 +161,10 @@ Outputs (callbacks the web adapter subscribes to):
 ### Play mode
 - Keyboard note keys and the step-nav cluster are inactive (no-op) — there
   is no editing cursor concept in Play mode.
-- The bottom PLAY button starts/stops the transport; incoming MIDI
-  Start/Continue/Stop messages do the same.
-- Each 6th clock pulse advances `playhead` (wraps 15→0). If the step at
+- The bottom PLAY button starts/stops the transport; the simulated MIDI In
+  toggle does the same (both call the core's `handleStart()`/`handleStop()`).
+- Each 6th simulated clock pulse (rate set by the BPM field) advances
+  `playhead` (wraps 15→0). If the step at
   `playhead` is unmuted and has a note, fire `onNoteOn` (LED shows green for
   that step during playback), then `onNoteOff` at the 50% gate point (3
   pulses later). If muted or empty, the playhead still advances but no LED
@@ -158,17 +173,16 @@ Outputs (callbacks the web adapter subscribes to):
 ## Data Persistence
 
 The `pattern` array is saved to `localStorage` on every edit and restored on
-page load. No other state (mode, cursor, BPM fallback value) needs to
-persist across reloads for this phase.
+page load. No other state (mode, cursor, BPM value) needs to persist across
+reloads for this phase.
 
 ## Testing / Verification
 
 Since this is browser UI, verification is manual in this phase:
-- Manually connect a MIDI clock source (DAW or hardware) via Web MIDI and
-  confirm the LEDs step in sync with tempo changes.
+- Confirm the simulated MIDI In toggle starts/stops playback, and that
+  changing the BPM field changes step speed immediately and correctly
+  (verify against a stopwatch/metronome at a couple of BPM values).
 - Manually program a pattern in Write mode and confirm playback in Play mode
   matches (correct notes, correct mute behavior, correct gate timing) both
   audibly (WebAudio) and via real MIDI Out (e.g. into a DAW or synth).
-- Confirm fallback BPM clock engages when no MIDI In is connected, and that
-  real clock pulses take over automatically once available.
 - Confirm pattern persists across a page refresh.
