@@ -73,6 +73,14 @@ for (let group = 0; group < 4; group++) {
   ledRow.appendChild(groupEl);
 }
 
+// Piano-interval x-positions for the staggered round keyboard buttons
+// (from the approved mockup): 7 white centers 62px apart; 5 black buttons
+// centered exactly between their flanking white keys.
+const WHITE_KEY_LEFT = [11, 73, 135, 197, 259, 321, 383];
+const BLACK_KEY_LEFT = [45, 107, 231, 293, 355];
+
+let nextWhiteIndex = 0;
+let nextBlackIndex = 0;
 const keyButtons = KEYBOARD_NOTES.map(({ note, label, type }) => {
   const button = document.createElement("button");
   button.className = `key ${type}`;
@@ -80,6 +88,7 @@ const keyButtons = KEYBOARD_NOTES.map(({ note, label, type }) => {
   button.title = label;
   button.setAttribute("aria-label", label);
   button.disabled = true; // enabled only in write mode
+  button.style.left = `${type === "white" ? WHITE_KEY_LEFT[nextWhiteIndex++] : BLACK_KEY_LEFT[nextBlackIndex++]}px`;
   keyboardEl.appendChild(button);
   return button;
 });
