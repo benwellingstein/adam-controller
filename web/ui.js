@@ -2,7 +2,16 @@ import { createSequencer } from "../core/sequencer.js";
 import { createClockSim } from "./clock-sim.js";
 import { createMidiOut } from "./midi.js";
 
-const PATTERN_STORAGE_KEY = "adam-controller-pattern";
+const PATTERN_BANK_STORAGE_KEY = "adam-controller-pattern-bank";
+const LEGACY_PATTERN_STORAGE_KEY = "adam-controller-pattern";
+const PATTERN_COUNT = 16;
+
+function emptyPattern() {
+  return Array.from({ length: 16 }, () => ({ note: null, muted: false }));
+}
+
+let patternBank = Array.from({ length: PATTERN_COUNT }, emptyPattern);
+let currentPatternIndex = 0;
 
 const KEYBOARD_NOTES = [
   { note: 60, label: "C", type: "white" },
@@ -29,6 +38,9 @@ const stepLeft = document.getElementById("step-left");
 const stepCenter = document.getElementById("step-center");
 const stepRight = document.getElementById("step-right");
 const modeLabels = document.querySelectorAll(".mode-label");
+const patternDial = document.getElementById("pattern-dial");
+const patternNumberEl = document.getElementById("pattern-number");
+const clearPatternButton = document.getElementById("clear-pattern-button");
 
 const ledElements = [];
 for (let group = 0; group < 4; group++) {
@@ -56,8 +68,32 @@ const keyButtons = KEYBOARD_NOTES.map(({ note, label, type }) => {
   return button;
 });
 
+function persistPatternBank() {
+  localStorage.setItem(
+    PATTERN_BANK_STORAGE_KEY,
+    JSON.stringify({ patterns: patternBank, currentIndex: currentPatternIndex })
+  );
+}
+
 function persistPattern() {
-  localStorage.setItem(PATTERN_STORAGE_KEY, JSON.stringify(sequencer.getPattern()));
+  patternBank[currentPatternIndex] = sequencer.getPattern();
+  persistPatternBank();
+}
+
+function updatePatternDisplay() {
+  patternNumberEl.textContent = String(currentPatternIndex + 1).padStart(2, "0");
+  const angle = -135 + (currentPatternIndex / (PATTERN_COUNT - 1)) * 270;
+  patternDial.style.setProperty("--dial-angle", `${angle}deg`);
+  patternDial.setAttribute("aria-valuenow", String(currentPatternIndex + 1));
+}
+
+function switchPattern(newIndex) {
+  const clamped = ((newIndex % PATTERN_COUNT) + PATTERN_COUNT) % PATTERN_COUNT;
+  patternBank[currentPatternIndex] = sequencer.getPattern();
+  currentPatternIndex = clamped;
+  sequencer.loadPattern(patternBank[currentPatternIndex]); // also resets cursor to 0
+  updatePatternDisplay();
+  persistPatternBank();
 }
 
 function updatePlayButtonState() {
@@ -71,6 +107,8 @@ function setControlsForMode(mode) {
   stepLeft.disabled = !isWrite;
   stepCenter.disabled = !isWrite;
   stepRight.disabled = !isWrite;
+  clearPatternButton.disabled = !isWrite;
+  patternDial.classList.toggle("is-disabled", !isWrite);
 }
 
 const midiOut = createMidiOut();
@@ -158,16 +196,89 @@ stepCenter.addEventListener("click", () => {
   persistPattern();
 });
 
+clearPatternButton.addEventListener("click", () => {
+  const cleared = emptyPattern();
+  patternBank[currentPatternIndex] = cleared;
+  sequencer.loadPattern(cleared);
+  persistPatternBank();
+});
+
+let dialDragStartY = null;
+let dialDragStartIndex = 0;
+
+patternDial.addEventListener("pointerdown", (event) => {
+  dialDragStartY = event.clientY;
+  dialDragStartIndex = currentPatternIndex;
+  patternDial.setPointerCapture(event.pointerId);
+});
+
+patternDial.addEventListener("pointermove", (event) => {
+  if (dialDragStartY === null) return;
+  const deltaY = dialDragStartY - event.clientY; // drag up = positive = increase
+  const steps = Math.round(deltaY / 12);
+  if (steps !== 0) {
+    switchPattern(dialDragStartIndex + steps);
+  }
+});
+
+patternDial.addEventListener("pointerup", () => {
+  dialDragStartY = null;
+});
+patternDial.addEventListener("pointercancel", () => {
+  dialDragStartY = null;
+});
+
+patternDial.addEventListener("wheel", (event) => {
+  event.preventDefault();
+  switchPattern(currentPatternIndex + (event.deltaY < 0 ? 1 : -1));
+});
+
+patternDial.addEventListener("keydown", (event) => {
+  if (event.key === "ArrowUp" || event.key === "ArrowRight") {
+    event.preventDefault();
+    switchPattern(currentPatternIndex + 1);
+  } else if (event.key === "ArrowDown" || event.key === "ArrowLeft") {
+    event.preventDefault();
+    switchPattern(currentPatternIndex - 1);
+  }
+});
+
 applyMode("write");
 
-const saved = localStorage.getItem(PATTERN_STORAGE_KEY);
-if (saved) {
-  try {
-    sequencer.loadPattern(JSON.parse(saved));
-  } catch {
-    // Malformed saved pattern: keep the empty pattern and fall through.
+function loadPatternBankFromStorage() {
+  const savedBank = localStorage.getItem(PATTERN_BANK_STORAGE_KEY);
+  if (savedBank) {
+    try {
+      const parsed = JSON.parse(savedBank);
+      if (Array.isArray(parsed.patterns) && parsed.patterns.length === PATTERN_COUNT) {
+        patternBank = parsed.patterns;
+        currentPatternIndex = Number.isInteger(parsed.currentIndex)
+          ? ((parsed.currentIndex % PATTERN_COUNT) + PATTERN_COUNT) % PATTERN_COUNT
+          : 0;
+        return;
+      }
+    } catch {
+      // Malformed saved bank: fall through to migration/defaults below.
+    }
+  }
+
+  // No valid bank yet: migrate a pre-pattern-bank single saved pattern (if
+  // any) into slot 0, then remove the old key.
+  const legacy = localStorage.getItem(LEGACY_PATTERN_STORAGE_KEY);
+  if (legacy) {
+    try {
+      const legacyPattern = JSON.parse(legacy);
+      if (Array.isArray(legacyPattern) && legacyPattern.length === 16) {
+        patternBank[0] = legacyPattern;
+      }
+    } catch {
+      // Malformed legacy pattern: leave slot 0 empty.
+    }
+    localStorage.removeItem(LEGACY_PATTERN_STORAGE_KEY);
   }
 }
-// Always render LEDs from actual state, whether the load succeeded, was
-// rejected as malformed, or never happened.
-sequencer.emitAllLeds();
+
+loadPatternBankFromStorage();
+sequencer.loadPattern(patternBank[currentPatternIndex]); // also renders LEDs
+updatePatternDisplay();
+persistPatternBank();

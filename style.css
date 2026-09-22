@@ -109,6 +109,65 @@ body {
   padding: 4px 6px;
 }
 
+.pattern-select {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font: 10px/1 monospace;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+}
+.pattern-select .dial {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--raised-top), var(--raised-bottom));
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+  position: relative;
+  cursor: grab;
+  touch-action: none;
+}
+.pattern-select .dial::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  width: 3px;
+  height: 14px;
+  margin-left: -1.5px;
+  background: var(--accent-gold);
+  border-radius: 2px;
+  box-shadow: 0 0 4px var(--accent-gold-glow);
+  transform: rotate(var(--dial-angle, -135deg));
+  transform-origin: 50% 16px;
+}
+.pattern-select .dial.is-disabled {
+  pointer-events: none;
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.pattern-select .pattern-number {
+  color: var(--text-fg);
+  background: var(--well-bg);
+  border: 1px solid var(--recessed-border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+}
+.pattern-select .clear-pattern {
+  margin-top: 4px;
+  background: linear-gradient(180deg, var(--raised-top), var(--raised-bottom));
+  border: 1px solid var(--raised-border);
+  border-radius: 4px;
+  color: var(--text-fg);
+  font: 10px/1 monospace;
+  letter-spacing: 0.5px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.pattern-select .clear-pattern:disabled { opacity: 0.4; cursor: not-allowed; }
+
 .placeholder { opacity: 0.35; }
 
 .led-row {
@@ -244,7 +303,9 @@ body {
 .oct button:focus-visible,
 .step-nav button:focus-visible,
 .key:focus-visible,
-#bpm-input:focus-visible {
+#bpm-input:focus-visible,
+#pattern-dial:focus-visible,
+#clear-pattern-button:focus-visible {
   outline: 2px solid var(--accent-gold);
   outline-offset: 2px;
 }

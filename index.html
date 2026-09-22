@@ -28,11 +28,11 @@
         </label>
       </div>
 
-      <div class="pattern-select placeholder" aria-disabled="true">
+      <div class="pattern-select">
         <span>PATTERN SELECT</span>
-        <div class="dial"></div>
-        <span class="pattern-number">1</span>
-        <button class="clear-pattern" disabled>CLEAR PATTERN</button>
+        <div id="pattern-dial" class="dial" role="slider" aria-valuemin="1" aria-valuemax="16" aria-valuenow="1" aria-label="Pattern select" tabindex="0"></div>
+        <span id="pattern-number" class="pattern-number">01</span>
+        <button id="clear-pattern-button" class="clear-pattern">CLEAR PATTERN</button>
       </div>
     </div>
 
