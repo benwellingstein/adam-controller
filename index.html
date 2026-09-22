@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Adam Controller Simulator</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="panel">
+    <div class="top-bar">
+      <div class="mode-switch">
+        <span>WRITE</span>
+        <label class="toggle">
+          <input type="checkbox" id="mode-toggle" />
+          <span class="toggle-track"></span>
+        </label>
+        <span>PLAY</span>
+      </div>
+
+      <button id="play-button" class="play-button" disabled>PLAY</button>
+
+      <div class="midi-in-sim">
+        <label>
+          <input type="checkbox" id="midi-in-toggle" />
+          MIDI In (simulated)
+        </label>
+        <label>
+          BPM
+          <input type="number" id="bpm-input" min="20" max="300" value="120" />
+        </label>
+      </div>
+
+      <div class="midi-out">
+        <label>
+          MIDI Out
+          <select id="midi-out-select"><option value="">(none)</option></select>
+        </label>
+        <span id="midi-out-status">not connected</span>
+      </div>
+
+      <div class="pattern-select placeholder" aria-disabled="true">
+        <span>PATTERN SELECT</span>
+        <div class="dial"></div>
+        <span class="pattern-number">1</span>
+        <button class="clear-pattern" disabled>CLEAR PATTERN</button>
+      </div>
+    </div>
+
+    <div class="led-row" id="led-row"></div>
+
+    <div class="bottom-row">
+      <div class="oct placeholder" aria-disabled="true">
+        <span>OCT</span>
+        <button disabled>+</button>
+        <button disabled>-</button>
+      </div>
+
+      <div class="keyboard" id="keyboard"></div>
+
+      <div class="step-nav">
+        <button id="step-left" aria-label="Move cursor left">&#9664;</button>
+        <button id="step-center" aria-label="Toggle mute">&#9632;</button>
+        <button id="step-right" aria-label="Move cursor right">&#9654;</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="web/ui.js"></script>
+</body>
+</html>

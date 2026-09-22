@@ -1,0 +1,112 @@
+:root {
+  --led-off: #333;
+  --led-yellow: #f5d90a;
+  --led-green: #2ecc40;
+  --led-dim-green: #1a5c22;
+  --panel-bg: #1e1e1e;
+  --panel-fg: #eee;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #0d0d0d;
+  color: var(--panel-fg);
+  font-family: system-ui, sans-serif;
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+}
+
+.panel {
+  background: var(--panel-bg);
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  max-width: 900px;
+}
+
+.top-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #444;
+}
+
+.mode-switch { display: flex; align-items: center; gap: 8px; }
+
+.play-button {
+  padding: 8px 20px;
+  border-radius: 6px;
+  border: none;
+  background: #444;
+  color: var(--panel-fg);
+  cursor: pointer;
+}
+.play-button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.midi-in-sim, .midi-out { display: flex; gap: 12px; align-items: center; }
+
+.placeholder { opacity: 0.35; }
+
+.led-row {
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  padding: 24px 0;
+  border-bottom: 1px solid #444;
+}
+
+.led-group { display: flex; gap: 10px; }
+
+.led {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--led-off);
+  border: 2px solid #000;
+}
+.led.yellow { background: var(--led-yellow); }
+.led.green { background: var(--led-green); }
+.led.dim-green { background: var(--led-dim-green); }
+
+.bottom-row {
+  display: flex;
+  gap: 24px;
+  align-items: flex-end;
+  padding-top: 20px;
+}
+
+.oct { display: flex; flex-direction: column; gap: 4px; width: 48px; }
+
+.keyboard { display: flex; gap: 2px; flex: 1; height: 100px; }
+
+.key {
+  border: 1px solid #000;
+  cursor: pointer;
+}
+.key.white { background: #eee; flex: 1; }
+.key.black {
+  background: #111;
+  width: 28px;
+  margin-left: -14px;
+  margin-right: -14px;
+  height: 60px;
+  z-index: 1;
+}
+.key:disabled { cursor: not-allowed; opacity: 0.5; }
+
+.step-nav { display: flex; gap: 8px; }
+.step-nav button {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  border: none;
+  background: #444;
+  color: var(--panel-fg);
+  cursor: pointer;
+}
+.step-nav button:disabled { opacity: 0.4; cursor: not-allowed; }
