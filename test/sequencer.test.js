@@ -77,3 +77,74 @@ test("inputNote while muted overwrites the note and un-mutes", () => {
   assert.equal(sequencer.getPattern()[0].note, 64);
   assert.equal(sequencer.getPattern()[0].muted, false);
 });
+
+test("handleClockPulse does nothing while not running", () => {
+  const { sequencer, notesOn } = makeHarness();
+  sequencer.setMode("play");
+  for (let i = 0; i < 12; i++) sequencer.handleClockPulse();
+  assert.equal(notesOn.length, 0);
+  assert.equal(sequencer.getState().playhead, 0);
+});
+
+test("advances one step every 6 clock pulses while running, firing note-on once per revolution for a programmed step", () => {
+  const { sequencer, notesOn } = makeHarness();
+  sequencer.inputNote(60); // step 0 = note 60, cursor advances to 1
+  sequencer.setMode("play"); // playhead reset to 0
+  sequencer.handleStart();
+
+  for (let i = 0; i < 5; i++) sequencer.handleClockPulse();
+  assert.equal(notesOn.length, 0); // not yet at the 6th pulse
+
+  sequencer.handleClockPulse(); // 6th pulse: advance to step 1 (empty, no note)
+  assert.equal(sequencer.getState().playhead, 1);
+  assert.equal(notesOn.length, 0);
+
+  // Advance through steps 2..15 and wrap back around to step 0 (15 more
+  // step-advances = 15 * 6 = 90 pulses), where the programmed note lives.
+  for (let i = 0; i < 15 * 6; i++) sequencer.handleClockPulse();
+  assert.equal(sequencer.getState().playhead, 0);
+  assert.equal(notesOn.length, 1);
+  assert.equal(notesOn[0], 60);
+});
+
+test("fires note-off exactly 3 pulses (50% gate) after note-on, and skips muted/empty steps", () => {
+  const { sequencer, notesOn, notesOff } = makeHarness();
+  sequencer.inputNote(60); // step 0
+  sequencer.setMode("play");
+  sequencer.handleStart();
+
+  // 16 step-advances (1 + 15) bring the playhead all the way around back to
+  // step 0, where the programmed note fires.
+  for (let i = 0; i < 6; i++) sequencer.handleClockPulse();
+  for (let i = 0; i < 15 * 6; i++) sequencer.handleClockPulse();
+  assert.equal(sequencer.getState().playhead, 0);
+  assert.equal(notesOn.length, 1);
+  assert.equal(notesOff.length, 0);
+
+  sequencer.handleClockPulse();
+  sequencer.handleClockPulse();
+  assert.equal(notesOff.length, 0);
+  sequencer.handleClockPulse(); // 3rd pulse since note-on: gate closes
+  assert.equal(notesOff.length, 1);
+  assert.equal(notesOff[0], 60);
+});
+
+test("handleStop halts playback, cuts any active note, and resets pulse count", () => {
+  const { sequencer, notesOff } = makeHarness();
+  sequencer.inputNote(60);
+  sequencer.setMode("play");
+  sequencer.handleStart();
+  // 16 step-advances bring the playhead back around to step 0, triggering the note.
+  for (let i = 0; i < 16 * 6; i++) sequencer.handleClockPulse();
+  sequencer.handleStop();
+  assert.equal(notesOff.length, 1);
+  assert.equal(sequencer.getState().running, false);
+});
+
+test("switching to write mode while playing stops the transport", () => {
+  const { sequencer } = makeHarness();
+  sequencer.setMode("play");
+  sequencer.handleStart();
+  sequencer.setMode("write");
+  assert.equal(sequencer.getState().running, false);
+});

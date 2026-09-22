@@ -71,10 +71,57 @@ export function createSequencer({ onLedChange, onNoteOn, onNoteOff }) {
   }
 
   // Play-mode / clock behavior implemented in Task 2.
-  function handleClockPulse() {}
-  function handleStart() {}
-  function handleStop() {}
-  function handleContinue() {}
+  function handleStart() {
+    if (mode !== "play") return;
+    running = true;
+  }
+
+  function handleStop() {
+    running = false;
+    clockPulseCount = 0;
+    if (activeNote !== null) {
+      onNoteOff(activeNote);
+      activeNote = null;
+      gatePulsesRemaining = null;
+    }
+    emitAllLeds();
+  }
+
+  function handleContinue() {
+    if (mode !== "play") return;
+    running = true;
+  }
+
+  function handleClockPulse() {
+    if (!running) return;
+
+    if (gatePulsesRemaining !== null) {
+      gatePulsesRemaining -= 1;
+      if (gatePulsesRemaining <= 0) {
+        onNoteOff(activeNote);
+        activeNote = null;
+        gatePulsesRemaining = null;
+        emitAllLeds();
+      }
+    }
+
+    clockPulseCount += 1;
+    if (clockPulseCount >= 6) {
+      clockPulseCount = 0;
+      advanceStep();
+    }
+  }
+
+  function advanceStep() {
+    playhead = (playhead + 1) % STEP_COUNT;
+    const step = pattern[playhead];
+    if (!step.muted && step.note !== null) {
+      onNoteOn(step.note);
+      activeNote = step.note;
+      gatePulsesRemaining = 3;
+    }
+    emitAllLeds();
+  }
 
   function getPattern() {
     return pattern.map((step) => ({ ...step }));
