@@ -1,4 +1,5 @@
 import { createSequencer } from "../core/sequencer.js";
+import { createClockSim } from "./clock-sim.js";
 
 const PATTERN_STORAGE_KEY = "adam-controller-pattern";
 
@@ -70,7 +71,6 @@ function setControlsForMode(mode) {
 }
 
 const midiOut = { noteOn: () => {}, noteOff: () => {} };
-const clockSim = { start: () => {}, stop: () => {} };
 
 const sequencer = createSequencer({
   onLedChange: (index, color) => {
@@ -82,6 +82,11 @@ const sequencer = createSequencer({
   onNoteOff: (note) => {
     midiOut.noteOff(note);
   },
+});
+
+const clockSim = createClockSim({
+  getBpm: () => bpmInput.value,
+  onTick: () => sequencer.handleClockPulse(),
 });
 
 modeToggle.addEventListener("change", () => {
