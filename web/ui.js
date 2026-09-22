@@ -88,9 +88,17 @@ modeToggle.addEventListener("change", () => {
   const newMode = modeToggle.checked ? "play" : "write";
   sequencer.setMode(newMode);
   setControlsForMode(newMode);
-  if (newMode === "write" && midiInToggle.checked) {
-    midiInToggle.checked = false;
-    clockSim.stop();
+  if (newMode === "write") {
+    if (midiInToggle.checked) {
+      midiInToggle.checked = false;
+      clockSim.stop();
+    }
+  } else if (midiInToggle.checked) {
+    // MIDI-in was already enabled while in write mode (a no-op there); now
+    // that we're entering play mode, actually start the transport so the
+    // toggle's checked state matches reality.
+    sequencer.handleStart();
+    clockSim.start();
   }
   updatePlayButtonLabel();
 });
