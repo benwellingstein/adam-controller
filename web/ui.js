@@ -41,6 +41,22 @@ const modeLabels = document.querySelectorAll(".mode-label");
 const patternDial = document.getElementById("pattern-dial");
 const patternNumberEl = document.getElementById("pattern-number");
 const clearPatternButton = document.getElementById("clear-pattern-button");
+const octaveUpButton = document.getElementById("octave-up");
+const octaveDownButton = document.getElementById("octave-down");
+const octaveDisplay = document.getElementById("octave-display");
+
+const OCTAVE_MIN = -3;
+const OCTAVE_MAX = 3;
+let octaveOffset = 0;
+
+function updateOctaveDisplay() {
+  octaveDisplay.textContent = octaveOffset > 0 ? `+${octaveOffset}` : String(octaveOffset);
+}
+
+function setOctaveOffset(newOffset) {
+  octaveOffset = Math.min(OCTAVE_MAX, Math.max(OCTAVE_MIN, newOffset));
+  updateOctaveDisplay();
+}
 
 const ledElements = [];
 for (let group = 0; group < 4; group++) {
@@ -109,6 +125,8 @@ function setControlsForMode(mode) {
   stepRight.disabled = !isWrite;
   clearPatternButton.disabled = !isWrite;
   patternDial.classList.toggle("is-disabled", !isWrite);
+  octaveUpButton.disabled = !isWrite;
+  octaveDownButton.disabled = !isWrite;
 }
 
 const midiOut = createMidiOut();
@@ -184,10 +202,13 @@ playButton.addEventListener("click", () => {
 
 keyButtons.forEach((btn) => {
   btn.addEventListener("click", () => {
-    sequencer.inputNote(Number(btn.dataset.note));
+    sequencer.inputNote(Number(btn.dataset.note) + octaveOffset * 12);
     persistPattern();
   });
 });
+
+octaveUpButton.addEventListener("click", () => setOctaveOffset(octaveOffset + 1));
+octaveDownButton.addEventListener("click", () => setOctaveOffset(octaveOffset - 1));
 
 stepLeft.addEventListener("click", () => sequencer.moveCursor(-1));
 stepRight.addEventListener("click", () => sequencer.moveCursor(1));
@@ -247,6 +268,7 @@ patternDial.addEventListener("keydown", (event) => {
 });
 
 applyMode("write");
+updateOctaveDisplay();
 
 function loadPatternBankFromStorage() {
   const savedBank = localStorage.getItem(PATTERN_BANK_STORAGE_KEY);

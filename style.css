@@ -228,6 +228,15 @@ body {
   padding: 4px 0;
 }
 
+.octave-display {
+  color: var(--text-fg);
+  background: var(--well-bg);
+  border: 1px solid var(--recessed-border);
+  border-radius: 4px;
+  padding: 2px 0;
+  font-size: 11px;
+}
+
 .play-button {
   width: 56px;
   height: 56px;
