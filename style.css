@@ -197,6 +197,7 @@ body {
   border-color: transparent;
 }
 .led.dim-green { background: var(--led-dim-green); border-color: transparent; }
+.led.out-of-loop { opacity: 0.4; }
 
 .bottom-row {
   display: flex;
@@ -324,7 +325,8 @@ body {
 .key:focus-visible,
 #bpm-input:focus-visible,
 #pattern-dial:focus-visible,
-#clear-pattern-button:focus-visible {
+#clear-pattern-button:focus-visible,
+#loop-length-dial:focus-visible {
   outline: 2px solid var(--accent-gold);
   outline-offset: 2px;
 }

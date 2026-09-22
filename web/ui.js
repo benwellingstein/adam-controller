@@ -10,7 +10,29 @@ function emptyPattern() {
   return Array.from({ length: 16 }, () => ({ note: null, muted: false }));
 }
 
-let patternBank = Array.from({ length: PATTERN_COUNT }, emptyPattern);
+function emptySlot() {
+  return { pattern: emptyPattern(), loopLength: PATTERN_COUNT };
+}
+
+function normalizeSlot(slot) {
+  if (Array.isArray(slot) && slot.length === 16) {
+    // Pre-loop-length format: bare pattern array, default full-length loop.
+    return { pattern: slot, loopLength: PATTERN_COUNT };
+  }
+  if (
+    slot &&
+    Array.isArray(slot.pattern) &&
+    slot.pattern.length === 16 &&
+    Number.isInteger(slot.loopLength) &&
+    slot.loopLength >= 1 &&
+    slot.loopLength <= PATTERN_COUNT
+  ) {
+    return slot;
+  }
+  return emptySlot();
+}
+
+let patternBank = Array.from({ length: PATTERN_COUNT }, emptySlot);
 let currentPatternIndex = 0;
 
 const KEYBOARD_NOTES = [
@@ -41,6 +63,8 @@ const modeLabels = document.querySelectorAll(".mode-label");
 const patternDial = document.getElementById("pattern-dial");
 const patternNumberEl = document.getElementById("pattern-number");
 const clearPatternButton = document.getElementById("clear-pattern-button");
+const loopLengthDial = document.getElementById("loop-length-dial");
+const loopLengthNumberEl = document.getElementById("loop-length-number");
 const octaveUpButton = document.getElementById("octave-up");
 const octaveDownButton = document.getElementById("octave-down");
 const octaveDisplay = document.getElementById("octave-display");
@@ -101,7 +125,10 @@ function persistPatternBank() {
 }
 
 function persistPattern() {
-  patternBank[currentPatternIndex] = sequencer.getPattern();
+  patternBank[currentPatternIndex] = {
+    pattern: sequencer.getPattern(),
+    loopLength: sequencer.getLoopLength(),
+  };
   persistPatternBank();
 }
 
@@ -112,12 +139,34 @@ function updatePatternDisplay() {
   patternDial.setAttribute("aria-valuenow", String(currentPatternIndex + 1));
 }
 
+function updateLoopLengthDisplay() {
+  const length = sequencer.getLoopLength();
+  loopLengthNumberEl.textContent = String(length).padStart(2, "0");
+  const angle = -135 + ((length - 1) / (PATTERN_COUNT - 1)) * 270;
+  loopLengthDial.style.setProperty("--dial-angle", `${angle}deg`);
+  loopLengthDial.setAttribute("aria-valuenow", String(length));
+}
+
+function setSlotLoopLength(newLength) {
+  const clamped = Math.min(PATTERN_COUNT, Math.max(1, newLength));
+  sequencer.setLoopLength(clamped);
+  sequencer.emitAllLeds(); // refresh out-of-loop dimming immediately
+  updateLoopLengthDisplay();
+  persistPattern();
+}
+
 function switchPattern(newIndex) {
   const clamped = ((newIndex % PATTERN_COUNT) + PATTERN_COUNT) % PATTERN_COUNT;
-  patternBank[currentPatternIndex] = sequencer.getPattern();
+  patternBank[currentPatternIndex] = {
+    pattern: sequencer.getPattern(),
+    loopLength: sequencer.getLoopLength(),
+  };
   currentPatternIndex = clamped;
-  sequencer.loadPattern(patternBank[currentPatternIndex]); // also resets cursor to 0
+  const slot = patternBank[currentPatternIndex];
+  sequencer.setLoopLength(slot.loopLength);
+  sequencer.loadPattern(slot.pattern); // also resets cursor to 0, renders LEDs with correct dimming
   updatePatternDisplay();
+  updateLoopLengthDisplay();
   persistPatternBank();
 }
 
@@ -134,6 +183,7 @@ function setControlsForMode(mode) {
   stepRight.disabled = !isWrite;
   clearPatternButton.disabled = !isWrite;
   patternDial.classList.toggle("is-disabled", !isWrite);
+  loopLengthDial.classList.toggle("is-disabled", !isWrite);
   octaveUpButton.disabled = !isWrite;
   octaveDownButton.disabled = !isWrite;
 }
@@ -149,7 +199,11 @@ function pitchClassButton(note) {
 
 const sequencer = createSequencer({
   onLedChange: (index, color) => {
-    ledElements[index].className = `led ${color}`;
+    const led = ledElements[index];
+    led.className = `led ${color}`;
+    if (index >= sequencer.getLoopLength()) {
+      led.classList.add("out-of-loop");
+    }
   },
   onNoteOn: (note) => {
     midiOut.noteOn(note);
@@ -245,7 +299,10 @@ stepCenter.addEventListener("click", () => {
 
 clearPatternButton.addEventListener("click", () => {
   const cleared = emptyPattern();
-  patternBank[currentPatternIndex] = cleared;
+  patternBank[currentPatternIndex] = {
+    pattern: cleared,
+    loopLength: sequencer.getLoopLength(),
+  };
   sequencer.loadPattern(cleared);
   persistPatternBank();
 });
@@ -295,6 +352,51 @@ patternDial.addEventListener("keydown", (event) => {
   }
 });
 
+let loopDialDragStartY = null;
+let loopDialDragStartLength = PATTERN_COUNT;
+let loopLastAppliedSteps = 0;
+
+loopLengthDial.addEventListener("pointerdown", (event) => {
+  loopDialDragStartY = event.clientY;
+  loopDialDragStartLength = sequencer.getLoopLength();
+  loopLastAppliedSteps = 0;
+  loopLengthDial.setPointerCapture(event.pointerId);
+});
+
+loopLengthDial.addEventListener("pointermove", (event) => {
+  if (loopDialDragStartY === null) return;
+  const deltaY = loopDialDragStartY - event.clientY;
+  const steps = Math.round(deltaY / 12);
+  if (steps !== loopLastAppliedSteps) {
+    setSlotLoopLength(loopDialDragStartLength + steps);
+    loopLastAppliedSteps = steps;
+  }
+});
+
+loopLengthDial.addEventListener("pointerup", () => {
+  loopDialDragStartY = null;
+});
+loopLengthDial.addEventListener("pointercancel", () => {
+  loopDialDragStartY = null;
+});
+
+loopLengthDial.addEventListener("wheel", (event) => {
+  event.preventDefault();
+  if (event.deltaY === 0) return;
+  setSlotLoopLength(sequencer.getLoopLength() + (event.deltaY < 0 ? 1 : -1));
+});
+
+loopLengthDial.addEventListener("keydown", (event) => {
+  if (loopLengthDial.classList.contains("is-disabled")) return;
+  if (event.key === "ArrowUp" || event.key === "ArrowRight") {
+    event.preventDefault();
+    setSlotLoopLength(sequencer.getLoopLength() + 1);
+  } else if (event.key === "ArrowDown" || event.key === "ArrowLeft") {
+    event.preventDefault();
+    setSlotLoopLength(sequencer.getLoopLength() - 1);
+  }
+});
+
 applyMode("write");
 updateOctaveDisplay();
 
@@ -304,10 +406,7 @@ function loadPatternBankFromStorage() {
     try {
       const parsed = JSON.parse(savedBank);
       if (Array.isArray(parsed.patterns) && parsed.patterns.length === PATTERN_COUNT) {
-        patternBank = Array.from({ length: PATTERN_COUNT }, (_, i) => {
-          const slot = parsed.patterns[i];
-          return Array.isArray(slot) && slot.length === 16 ? slot : emptyPattern();
-        });
+        patternBank = Array.from({ length: PATTERN_COUNT }, (_, i) => normalizeSlot(parsed.patterns[i]));
         currentPatternIndex = Number.isInteger(parsed.currentIndex)
           ? ((parsed.currentIndex % PATTERN_COUNT) + PATTERN_COUNT) % PATTERN_COUNT
           : 0;
@@ -325,7 +424,7 @@ function loadPatternBankFromStorage() {
     try {
       const legacyPattern = JSON.parse(legacy);
       if (Array.isArray(legacyPattern) && legacyPattern.length === 16) {
-        patternBank[0] = legacyPattern;
+        patternBank[0] = { pattern: legacyPattern, loopLength: PATTERN_COUNT };
       }
     } catch {
       // Malformed legacy pattern: leave slot 0 empty.
@@ -335,6 +434,8 @@ function loadPatternBankFromStorage() {
 }
 
 loadPatternBankFromStorage();
-sequencer.loadPattern(patternBank[currentPatternIndex]); // also renders LEDs
+sequencer.setLoopLength(patternBank[currentPatternIndex].loopLength);
+sequencer.loadPattern(patternBank[currentPatternIndex].pattern); // also renders LEDs
 updatePatternDisplay();
+updateLoopLengthDisplay();
 persistPatternBank();
