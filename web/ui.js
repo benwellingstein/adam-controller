@@ -75,10 +75,7 @@ function setControlsForMode(mode) {
   stepRight.disabled = !isWrite;
 }
 
-const midiOut = createMidiOut({
-  selectEl: document.getElementById("midi-out-select"),
-  statusEl: document.getElementById("midi-out-status"),
-});
+const midiOut = createMidiOut();
 
 const sequencer = createSequencer({
   onLedChange: (index, color) => {

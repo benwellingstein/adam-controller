@@ -1,5 +1,4 @@
-export function createMidiOut({ selectEl, statusEl }) {
-  let output = null;
+export function createMidiOut() {
   let audioCtx = null;
 
   function getAudioContext() {
@@ -32,63 +31,14 @@ export function createMidiOut({ selectEl, statusEl }) {
     osc.stop(ctx.currentTime + durationSeconds);
   }
 
-  function send(bytes) {
-    if (!output) return;
-    try {
-      output.send(bytes);
-    } catch (err) {
-      // A disconnected or otherwise invalid output can throw; don't let that
-      // break playback.
-      console.warn("MIDI send failed:", err);
-    }
-  }
-
   function noteOn(noteNumber) {
-    send([0x90, noteNumber, 100]);
     playTone(noteNumber, 0.3);
   }
 
-  function noteOff(noteNumber) {
-    send([0x80, noteNumber, 0]);
+  function noteOff() {
+    // Playback is WebAudio-only now: each note is a fixed-duration envelope
+    // started in noteOn, so there's nothing to cut short here.
   }
-
-  function populateOutputs(access) {
-    const previousId = output ? output.id : null;
-    selectEl.innerHTML = '<option value="">(none)</option>';
-    for (const out of access.outputs.values()) {
-      const opt = document.createElement("option");
-      opt.value = out.id;
-      opt.textContent = out.name;
-      selectEl.appendChild(opt);
-    }
-    if (previousId !== null && !access.outputs.get(previousId)) {
-      // The selected device went away mid-session; drop the stale reference.
-      output = null;
-      statusEl.textContent = "not connected";
-    } else if (previousId !== null) {
-      selectEl.value = previousId;
-    }
-    selectEl.onchange = () => {
-      output = access.outputs.get(selectEl.value) || null;
-      statusEl.textContent = output ? `connected: ${output.name}` : "not connected";
-    };
-  }
-
-  async function init() {
-    if (!navigator.requestMIDIAccess) {
-      statusEl.textContent = "Web MIDI not supported in this browser";
-      return;
-    }
-    try {
-      const access = await navigator.requestMIDIAccess();
-      populateOutputs(access);
-      access.onstatechange = () => populateOutputs(access);
-    } catch {
-      statusEl.textContent = "MIDI access denied";
-    }
-  }
-
-  init();
 
   return { noteOn, noteOff };
 }

@@ -48,7 +48,7 @@ body {
 }
 .play-button:disabled { opacity: 0.4; cursor: not-allowed; }
 
-.midi-in-sim, .midi-out { display: flex; gap: 12px; align-items: center; }
+.midi-in-sim { display: flex; gap: 12px; align-items: center; }
 
 .placeholder { opacity: 0.35; }
 
