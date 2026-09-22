@@ -219,6 +219,7 @@ playButton.addEventListener("click", () => {
 });
 
 const KEY_CLICK_FLASH_MS = 150;
+const flashTimers = new Map();
 
 keyButtons.forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -226,8 +227,9 @@ keyButtons.forEach((btn) => {
     persistPattern();
     // Write mode doesn't produce a real note-on/off gate to sync to, so
     // flash the clicked button briefly as instant feedback instead.
+    clearTimeout(flashTimers.get(btn));
     btn.classList.add("lit");
-    setTimeout(() => btn.classList.remove("lit"), KEY_CLICK_FLASH_MS);
+    flashTimers.set(btn, setTimeout(() => btn.classList.remove("lit"), KEY_CLICK_FLASH_MS));
   });
 });
 

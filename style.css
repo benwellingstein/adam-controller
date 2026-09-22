@@ -299,6 +299,7 @@ body {
 }
 .key:disabled { cursor: not-allowed; opacity: 0.5; }
 .key.lit {
+  opacity: 1;
   background: radial-gradient(circle at 35% 35%, var(--led-green), var(--led-green-dark));
   box-shadow: 0 0 14px var(--led-green-glow), 0 3px 6px rgba(0, 0, 0, 0.5);
 }
