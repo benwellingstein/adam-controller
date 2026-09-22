@@ -205,10 +205,12 @@ clearPatternButton.addEventListener("click", () => {
 
 let dialDragStartY = null;
 let dialDragStartIndex = 0;
+let lastAppliedSteps = 0;
 
 patternDial.addEventListener("pointerdown", (event) => {
   dialDragStartY = event.clientY;
   dialDragStartIndex = currentPatternIndex;
+  lastAppliedSteps = 0;
   patternDial.setPointerCapture(event.pointerId);
 });
 
@@ -216,8 +218,9 @@ patternDial.addEventListener("pointermove", (event) => {
   if (dialDragStartY === null) return;
   const deltaY = dialDragStartY - event.clientY; // drag up = positive = increase
   const steps = Math.round(deltaY / 12);
-  if (steps !== 0) {
+  if (steps !== lastAppliedSteps) {
     switchPattern(dialDragStartIndex + steps);
+    lastAppliedSteps = steps;
   }
 });
 
