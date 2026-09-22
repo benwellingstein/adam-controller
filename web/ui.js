@@ -140,15 +140,24 @@ function setControlsForMode(mode) {
 
 const midiOut = createMidiOut();
 
+// Maps a MIDI note to its keyboard button by pitch class, so a transposed
+// note (via OCT) still lights the visible button with the same letter name.
+function pitchClassButton(note) {
+  const pitchClass = ((note % 12) + 12) % 12;
+  return keyButtons[pitchClass];
+}
+
 const sequencer = createSequencer({
   onLedChange: (index, color) => {
     ledElements[index].className = `led ${color}`;
   },
   onNoteOn: (note) => {
     midiOut.noteOn(note);
+    pitchClassButton(note).classList.add("lit");
   },
   onNoteOff: (note) => {
     midiOut.noteOff(note);
+    pitchClassButton(note).classList.remove("lit");
   },
 });
 
@@ -209,10 +218,16 @@ playButton.addEventListener("click", () => {
   }
 });
 
+const KEY_CLICK_FLASH_MS = 150;
+
 keyButtons.forEach((btn) => {
   btn.addEventListener("click", () => {
     sequencer.inputNote(Number(btn.dataset.note) + octaveOffset * 12);
     persistPattern();
+    // Write mode doesn't produce a real note-on/off gate to sync to, so
+    // flash the clicked button briefly as instant feedback instead.
+    btn.classList.add("lit");
+    setTimeout(() => btn.classList.remove("lit"), KEY_CLICK_FLASH_MS);
   });
 });
 
