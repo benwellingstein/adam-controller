@@ -10,15 +10,12 @@
   <div class="panel">
     <div class="top-bar">
       <div class="mode-switch">
-        <span>WRITE</span>
-        <label class="toggle">
-          <input type="checkbox" id="mode-toggle" />
-          <span class="toggle-track"></span>
-        </label>
-        <span>PLAY</span>
+        <span class="mode-label" data-side="write">WRITE</span>
+        <button type="button" id="mode-toggle" class="rocker" role="switch" aria-checked="false" aria-label="Write or Play mode">
+          <span class="rocker-tab"></span>
+        </button>
+        <span class="mode-label" data-side="play">PLAY</span>
       </div>
-
-      <button id="play-button" class="play-button" disabled>PLAY</button>
 
       <div class="midi-in-sim">
         <label>
@@ -42,10 +39,15 @@
     <div class="led-row" id="led-row"></div>
 
     <div class="bottom-row">
-      <div class="oct placeholder" aria-disabled="true">
-        <span>OCT</span>
-        <button disabled>+</button>
-        <button disabled>-</button>
+      <div class="bottom-left">
+        <div class="oct placeholder" aria-disabled="true">
+          <span>OCT</span>
+          <button disabled>+</button>
+          <button disabled>-</button>
+        </div>
+        <button id="play-button" class="play-button" disabled aria-label="Play or stop">
+          <span class="play-icon"></span>
+        </button>
       </div>
 
       <div class="keyboard" id="keyboard"></div>

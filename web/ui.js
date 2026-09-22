@@ -28,6 +28,7 @@ const bpmInput = document.getElementById("bpm-input");
 const stepLeft = document.getElementById("step-left");
 const stepCenter = document.getElementById("step-center");
 const stepRight = document.getElementById("step-right");
+const modeLabels = document.querySelectorAll(".mode-label");
 
 const ledElements = [];
 for (let group = 0; group < 4; group++) {
@@ -59,8 +60,8 @@ function persistPattern() {
   localStorage.setItem(PATTERN_STORAGE_KEY, JSON.stringify(sequencer.getPattern()));
 }
 
-function updatePlayButtonLabel() {
-  playButton.textContent = sequencer.getState().running ? "STOP" : "PLAY";
+function updatePlayButtonState() {
+  playButton.classList.toggle("is-running", sequencer.getState().running);
 }
 
 function setControlsForMode(mode) {
@@ -98,23 +99,32 @@ function startPlayback() {
   if (sequencer.getState().running) {
     clockSim.start();
   }
-  updatePlayButtonLabel();
+  updatePlayButtonState();
 }
 
 function stopPlayback() {
   clockSim.stop();
   sequencer.handleStop();
-  updatePlayButtonLabel();
+  updatePlayButtonState();
 }
 
-modeToggle.addEventListener("change", () => {
-  const newMode = modeToggle.checked ? "play" : "write";
+function applyMode(newMode) {
   sequencer.setMode(newMode); // clears `running` itself
   setControlsForMode(newMode);
+  modeToggle.setAttribute("aria-checked", String(newMode === "play"));
+  modeToggle.classList.toggle("is-play", newMode === "play");
+  modeLabels.forEach((label) => {
+    label.classList.toggle("is-active", label.dataset.side === newMode);
+  });
   if (newMode === "write") {
     clockSim.stop();
   }
-  updatePlayButtonLabel();
+  updatePlayButtonState();
+}
+
+modeToggle.addEventListener("click", () => {
+  const currentMode = sequencer.getState().mode;
+  applyMode(currentMode === "write" ? "play" : "write");
 });
 
 playButton.addEventListener("click", () => {
@@ -139,8 +149,7 @@ stepCenter.addEventListener("click", () => {
   persistPattern();
 });
 
-setControlsForMode("write");
-updatePlayButtonLabel();
+applyMode("write");
 
 const saved = localStorage.getItem(PATTERN_STORAGE_KEY);
 if (saved) {
