@@ -87,10 +87,19 @@ const sequencer = createSequencer({
   },
 });
 
+const BPM_MIN = Number(bpmInput.min);
+const BPM_MAX = Number(bpmInput.max);
+
+function clampedBpm() {
+  const value = Number(bpmInput.value);
+  if (Number.isNaN(value)) return BPM_MIN;
+  return Math.min(BPM_MAX, Math.max(BPM_MIN, value));
+}
+
 // The MIDI In (simulated) toggle no longer starts/stops playback — it only
 // selects which tempo source drives the clock while PLAY is running.
 const clockSim = createClockSim({
-  getBpm: () => (midiInToggle.checked ? Number(bpmInput.value) : 120),
+  getBpm: () => (midiInToggle.checked ? clampedBpm() : 120),
   onTick: () => sequencer.handleClockPulse(),
 });
 
