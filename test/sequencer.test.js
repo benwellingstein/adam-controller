@@ -148,3 +148,33 @@ test("switching to write mode while playing stops the transport", () => {
   sequencer.setMode("write");
   assert.equal(sequencer.getState().running, false);
 });
+
+test("getPattern reflects programmed notes and mute state", () => {
+  const { sequencer } = makeHarness();
+  sequencer.inputNote(60);
+  sequencer.moveCursor(-1);
+  sequencer.toggleMute();
+  const pattern = sequencer.getPattern();
+  assert.equal(pattern.length, 16);
+  assert.deepEqual(pattern[0], { note: 60, muted: true });
+  assert.deepEqual(pattern[1], { note: null, muted: false });
+});
+
+test("loadPattern restores a saved pattern and re-renders LEDs", () => {
+  const { sequencer, ledColors } = makeHarness();
+  const saved = Array.from({ length: 16 }, (_, i) => ({
+    note: i === 3 ? 67 : null,
+    muted: i === 3,
+  }));
+  sequencer.loadPattern(saved);
+  assert.deepEqual(sequencer.getPattern()[3], { note: 67, muted: true });
+  assert.equal(ledColors[3], "dim-green");
+});
+
+test("loadPattern ignores malformed input instead of throwing", () => {
+  const { sequencer } = makeHarness();
+  sequencer.inputNote(60);
+  assert.doesNotThrow(() => sequencer.loadPattern(null));
+  assert.doesNotThrow(() => sequencer.loadPattern([{ note: 1 }]));
+  assert.equal(sequencer.getPattern()[0].note, 60);
+});
