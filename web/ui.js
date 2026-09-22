@@ -1,5 +1,6 @@
 import { createSequencer } from "../core/sequencer.js";
 import { createClockSim } from "./clock-sim.js";
+import { createMidiOut } from "./midi.js";
 
 const PATTERN_STORAGE_KEY = "adam-controller-pattern";
 
@@ -70,7 +71,10 @@ function setControlsForMode(mode) {
   stepRight.disabled = !isWrite;
 }
 
-const midiOut = { noteOn: () => {}, noteOff: () => {} };
+const midiOut = createMidiOut({
+  selectEl: document.getElementById("midi-out-select"),
+  statusEl: document.getElementById("midi-out-status"),
+});
 
 const sequencer = createSequencer({
   onLedChange: (index, color) => {
