@@ -49,6 +49,7 @@ const keyButtons = KEYBOARD_NOTES.map(({ note, label, type }) => {
   button.className = `key ${type}`;
   button.dataset.note = String(note);
   button.title = label;
+  button.setAttribute("aria-label", label);
   button.disabled = true; // enabled only in write mode
   keyboardEl.appendChild(button);
   return button;
@@ -65,6 +66,9 @@ function updatePlayButtonLabel() {
 function setControlsForMode(mode) {
   const isWrite = mode === "write";
   playButton.disabled = isWrite;
+  // The MIDI In toggle is the other half of the same transport control, so it
+  // is only usable where the PLAY button is.
+  midiInToggle.disabled = isWrite;
   keyButtons.forEach((btn) => (btn.disabled = !isWrite));
   stepLeft.disabled = !isWrite;
   stepCenter.disabled = !isWrite;
@@ -93,44 +97,52 @@ const clockSim = createClockSim({
   onTick: () => sequencer.handleClockPulse(),
 });
 
-modeToggle.addEventListener("change", () => {
-  const newMode = modeToggle.checked ? "play" : "write";
-  sequencer.setMode(newMode);
-  setControlsForMode(newMode);
-  if (newMode === "write") {
-    if (midiInToggle.checked) {
-      midiInToggle.checked = false;
-      clockSim.stop();
-    }
-  } else if (midiInToggle.checked) {
-    // MIDI-in was already enabled while in write mode (a no-op there); now
-    // that we're entering play mode, actually start the transport so the
-    // toggle's checked state matches reality.
-    sequencer.handleStart();
+// Single source of truth for the transport: the PLAY button and the simulated
+// MIDI In toggle are two ways to drive the same sequencer + clock state, and
+// both are re-synced from the sequencer's actual `running` flag afterwards.
+function syncTransportControls() {
+  updatePlayButtonLabel();
+  midiInToggle.checked = sequencer.getState().running;
+}
+
+function startPlayback() {
+  sequencer.handleStart(); // no-op unless we're in play mode
+  if (sequencer.getState().running) {
     clockSim.start();
   }
-  updatePlayButtonLabel();
+  syncTransportControls();
+}
+
+function stopPlayback() {
+  clockSim.stop();
+  sequencer.handleStop();
+  syncTransportControls();
+}
+
+modeToggle.addEventListener("change", () => {
+  const newMode = modeToggle.checked ? "play" : "write";
+  sequencer.setMode(newMode); // clears `running` itself
+  setControlsForMode(newMode);
+  if (newMode === "write") {
+    clockSim.stop();
+  }
+  syncTransportControls();
 });
 
 playButton.addEventListener("click", () => {
-  const { running } = sequencer.getState();
-  if (running) {
-    sequencer.handleStop();
+  if (sequencer.getState().running) {
+    stopPlayback();
   } else {
-    sequencer.handleStart();
+    startPlayback();
   }
-  updatePlayButtonLabel();
 });
 
 midiInToggle.addEventListener("change", () => {
   if (midiInToggle.checked) {
-    sequencer.handleStart();
-    clockSim.start();
+    startPlayback();
   } else {
-    clockSim.stop();
-    sequencer.handleStop();
+    stopPlayback();
   }
-  updatePlayButtonLabel();
 });
 
 keyButtons.forEach((btn) => {
@@ -148,14 +160,16 @@ stepCenter.addEventListener("click", () => {
 });
 
 setControlsForMode("write");
+syncTransportControls();
 
 const saved = localStorage.getItem(PATTERN_STORAGE_KEY);
 if (saved) {
   try {
     sequencer.loadPattern(JSON.parse(saved));
   } catch {
-    sequencer.emitAllLeds();
+    // Malformed saved pattern: keep the empty pattern and fall through.
   }
-} else {
-  sequencer.emitAllLeds();
 }
+// Always render LEDs from actual state, whether the load succeeded, was
+// rejected as malformed, or never happened.
+sequencer.emitAllLeds();
