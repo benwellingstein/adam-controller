@@ -227,6 +227,7 @@ body {
   color: var(--text-fg);
   padding: 4px 0;
 }
+.oct button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .octave-display {
   color: var(--text-fg);

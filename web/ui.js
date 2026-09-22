@@ -254,10 +254,12 @@ patternDial.addEventListener("pointercancel", () => {
 
 patternDial.addEventListener("wheel", (event) => {
   event.preventDefault();
+  if (event.deltaY === 0) return;
   switchPattern(currentPatternIndex + (event.deltaY < 0 ? 1 : -1));
 });
 
 patternDial.addEventListener("keydown", (event) => {
+  if (patternDial.classList.contains("is-disabled")) return;
   if (event.key === "ArrowUp" || event.key === "ArrowRight") {
     event.preventDefault();
     switchPattern(currentPatternIndex + 1);
@@ -276,7 +278,10 @@ function loadPatternBankFromStorage() {
     try {
       const parsed = JSON.parse(savedBank);
       if (Array.isArray(parsed.patterns) && parsed.patterns.length === PATTERN_COUNT) {
-        patternBank = parsed.patterns;
+        patternBank = Array.from({ length: PATTERN_COUNT }, (_, i) => {
+          const slot = parsed.patterns[i];
+          return Array.isArray(slot) && slot.length === 16 ? slot : emptyPattern();
+        });
         currentPatternIndex = Number.isInteger(parsed.currentIndex)
           ? ((parsed.currentIndex % PATTERN_COUNT) + PATTERN_COUNT) % PATTERN_COUNT
           : 0;
