@@ -273,3 +273,15 @@ test("loadPattern resets the write-mode cursor to step 0", () => {
   assert.equal(ledColors[0], "yellow");
   assert.equal(ledColors[3], "off");
 });
+
+test("switching mode while a note is sounding fires note-off for the active note", () => {
+  const { sequencer, notesOff } = makeHarness();
+  sequencer.inputNote(60);
+  sequencer.setMode("play");
+  sequencer.handleStart(); // note-on for step 0, gate open
+  assert.equal(notesOff.length, 0);
+
+  sequencer.setMode("write");
+  assert.equal(notesOff.length, 1);
+  assert.equal(notesOff[0], 60);
+});

@@ -42,8 +42,11 @@ export function createSequencer({ onLedChange, onNoteOn, onNoteOff }) {
     mode = newMode;
     running = false;
     clockPulseCount = 0;
-    activeNote = null;
-    gatePulsesRemaining = null;
+    if (activeNote !== null) {
+      onNoteOff(activeNote);
+      activeNote = null;
+      gatePulsesRemaining = null;
+    }
     if (newMode === "play") {
       playhead = 0;
     }
