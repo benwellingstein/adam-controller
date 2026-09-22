@@ -66,9 +66,6 @@ function updatePlayButtonLabel() {
 function setControlsForMode(mode) {
   const isWrite = mode === "write";
   playButton.disabled = isWrite;
-  // The MIDI In toggle is the other half of the same transport control, so it
-  // is only usable where the PLAY button is.
-  midiInToggle.disabled = isWrite;
   keyButtons.forEach((btn) => (btn.disabled = !isWrite));
   stepLeft.disabled = !isWrite;
   stepCenter.disabled = !isWrite;
@@ -89,31 +86,25 @@ const sequencer = createSequencer({
   },
 });
 
+// The MIDI In (simulated) toggle no longer starts/stops playback — it only
+// selects which tempo source drives the clock while PLAY is running.
 const clockSim = createClockSim({
-  getBpm: () => bpmInput.value,
+  getBpm: () => (midiInToggle.checked ? Number(bpmInput.value) : 120),
   onTick: () => sequencer.handleClockPulse(),
 });
-
-// Single source of truth for the transport: the PLAY button and the simulated
-// MIDI In toggle are two ways to drive the same sequencer + clock state, and
-// both are re-synced from the sequencer's actual `running` flag afterwards.
-function syncTransportControls() {
-  updatePlayButtonLabel();
-  midiInToggle.checked = sequencer.getState().running;
-}
 
 function startPlayback() {
   sequencer.handleStart(); // no-op unless we're in play mode
   if (sequencer.getState().running) {
     clockSim.start();
   }
-  syncTransportControls();
+  updatePlayButtonLabel();
 }
 
 function stopPlayback() {
   clockSim.stop();
   sequencer.handleStop();
-  syncTransportControls();
+  updatePlayButtonLabel();
 }
 
 modeToggle.addEventListener("change", () => {
@@ -123,7 +114,7 @@ modeToggle.addEventListener("change", () => {
   if (newMode === "write") {
     clockSim.stop();
   }
-  syncTransportControls();
+  updatePlayButtonLabel();
 });
 
 playButton.addEventListener("click", () => {
@@ -131,14 +122,6 @@ playButton.addEventListener("click", () => {
     stopPlayback();
   } else {
     startPlayback();
-  }
-});
-
-midiInToggle.addEventListener("change", () => {
-  if (midiInToggle.checked) {
-    startPlayback();
-  } else {
-    stopPlayback();
   }
 });
 
@@ -157,7 +140,7 @@ stepCenter.addEventListener("click", () => {
 });
 
 setControlsForMode("write");
-syncTransportControls();
+updatePlayButtonLabel();
 
 const saved = localStorage.getItem(PATTERN_STORAGE_KEY);
 if (saved) {
