@@ -14,6 +14,7 @@ export function createSequencer({ onLedChange, onNoteOn, onNoteOff }) {
   let clockPulseCount = 0;
   let activeNote = null;
   let gatePulsesRemaining = null;
+  let loopLength = STEP_COUNT;
 
   function ledColorForStep(index) {
     if (mode === "write") {
@@ -129,9 +130,17 @@ export function createSequencer({ onLedChange, onNoteOn, onNoteOff }) {
   }
 
   function advanceStep() {
-    playhead = (playhead + 1) % STEP_COUNT;
+    playhead = (playhead + 1) % loopLength;
     triggerCurrentStep();
     emitAllLeds();
+  }
+
+  function setLoopLength(n) {
+    loopLength = Math.min(STEP_COUNT, Math.max(1, Math.floor(n)));
+  }
+
+  function getLoopLength() {
+    return loopLength;
   }
 
   function getPattern() {
@@ -168,5 +177,7 @@ export function createSequencer({ onLedChange, onNoteOn, onNoteOff }) {
     loadPattern,
     emitAllLeds,
     getState,
+    setLoopLength,
+    getLoopLength,
   };
 }

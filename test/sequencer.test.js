@@ -285,3 +285,30 @@ test("switching mode while a note is sounding fires note-off for the active note
   assert.equal(notesOff.length, 1);
   assert.equal(notesOff[0], 60);
 });
+
+test("setLoopLength clamps to 1-16", () => {
+  const { sequencer } = makeHarness();
+  sequencer.setLoopLength(0);
+  assert.equal(sequencer.getLoopLength(), 1);
+  sequencer.setLoopLength(99);
+  assert.equal(sequencer.getLoopLength(), 16);
+  sequencer.setLoopLength(4);
+  assert.equal(sequencer.getLoopLength(), 4);
+});
+
+test("playback wraps at the loop length instead of step 16", () => {
+  const { sequencer, notesOn } = makeHarness();
+  sequencer.inputNote(60); // step 0 = note 60, cursor -> 1
+  sequencer.moveCursor(3); // cursor -> step 4
+  sequencer.inputNote(72); // step 4 = note 72, cursor -> 5
+  sequencer.setLoopLength(4);
+  sequencer.setMode("play");
+  sequencer.handleStart(); // step 0 fires immediately
+  assert.deepEqual(notesOn, [60]);
+
+  // 4 step-advances (4*6=24 pulses) should wrap the loop (0->1->2->3->0)
+  // back to step 0 without ever reaching step 4's note.
+  for (let i = 0; i < 4 * 6; i++) sequencer.handleClockPulse();
+  assert.equal(sequencer.getState().playhead, 0);
+  assert.deepEqual(notesOn, [60, 60]);
+});
