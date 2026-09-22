@@ -260,3 +260,16 @@ test("loadPattern ignores malformed input instead of throwing", () => {
   assert.doesNotThrow(() => sequencer.loadPattern([{ note: 1 }]));
   assert.equal(sequencer.getPattern()[0].note, 60);
 });
+
+test("loadPattern resets the write-mode cursor to step 0", () => {
+  const { sequencer, ledColors } = makeHarness();
+  sequencer.moveCursor(3); // cursor now on step 3
+  assert.equal(sequencer.getState().cursor, 3);
+
+  const saved = Array.from({ length: 16 }, () => ({ note: null, muted: false }));
+  sequencer.loadPattern(saved);
+
+  assert.equal(sequencer.getState().cursor, 0);
+  assert.equal(ledColors[0], "yellow");
+  assert.equal(ledColors[3], "off");
+});

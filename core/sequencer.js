@@ -144,6 +144,7 @@ export function createSequencer({ onLedChange, onNoteOn, onNoteOff }) {
         muted: Boolean(entry.muted),
       };
     }
+    cursor = 0;
     emitAllLeds();
   }
 
